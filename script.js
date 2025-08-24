@@ -474,10 +474,10 @@ Clarity.prototype.draw = function (context) {
     this.draw_player(context);
 };
 
-function render3DMap(mapData) {
-    if (typeof THREE === 'undefined') return;
+function setup3DScene(mapData) {
+    if (typeof THREE === 'undefined') return null;
     var container = document.getElementById('scene3d');
-    if (!container) return;
+    if (!container) return null;
     var width = container.clientWidth;
     var height = container.clientHeight;
     var scene = new THREE.Scene();
@@ -485,6 +485,7 @@ function render3DMap(mapData) {
     var renderer = new THREE.WebGLRenderer({antialias: true});
     renderer.setSize(width, height);
     renderer.setClearColor(0x222222);
+    container.innerHTML = '';
     container.appendChild(renderer.domElement);
 
     var tileSize = mapData.tile_size;
@@ -501,6 +502,12 @@ function render3DMap(mapData) {
             scene.add(cube);
         }
     }
+
+    var playerGeo = new THREE.SphereGeometry(tileSize / 2, 16, 16);
+    var playerMat = new THREE.MeshLambertMaterial({color: mapData.player.colour || '#33cc33'});
+    var playerMesh = new THREE.Mesh(playerGeo, playerMat);
+    playerMesh.position.y = tileSize / 2;
+    scene.add(playerMesh);
 
     // Basic lighting so colours are visible
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
@@ -520,6 +527,14 @@ function render3DMap(mapData) {
         renderer.render(scene, camera);
     }
     animate();
+
+    return {
+        update: function(playerLoc) {
+            if (!playerLoc) return;
+            playerMesh.position.x = playerLoc.x;
+            playerMesh.position.z = playerLoc.y;
+        }
+    };
 }
 
 /* Setup of the engine */
@@ -541,21 +556,24 @@ canvas.width = 400;
 canvas.height = 400;
 
 var game = new Clarity();
-    game.set_viewport(canvas.width, canvas.height);
-    game.load_map(map);
-    render3DMap(map);
+game.set_viewport(canvas.width, canvas.height);
+game.load_map(map);
+var threeScene = setup3DScene(map);
 
-    /* Limit the viewport to the confines of the map */
-    game.limit_viewport = true;
+/* Limit the viewport to the confines of the map */
+game.limit_viewport = true;
 
 var Loop = function() {
-  
+
   ctx.fillStyle = '#333';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
+
   game.update();
   game.draw(ctx);
-  
+  if (threeScene) {
+    threeScene.update(game.player.loc);
+  }
+
   window.requestAnimFrame(Loop);
 };
 
