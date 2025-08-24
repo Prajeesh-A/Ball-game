@@ -144,6 +144,35 @@ var map = {
     }
 };
 
+var advancedMap = {
+    tile_size: 16,
+    keys: [
+        {id: 0, colour: '#333', solid: 0},
+        {id: 1, colour: '#888', solid: 0},
+        {id: 2, colour: '#555', solid: 1, bounce: 0.35},
+        {id: 3, colour: '#0FF', solid: 0, script: 'teleport'},
+        {id: 4, colour: '#C93232', solid: 0, script: 'death'},
+        {id: 5, colour: '#FADF73', solid: 0, script: 'win'}
+    ],
+    data: [
+        [2,2,2,2,2,2,2,2,2,2],
+        [2,1,1,1,1,1,1,1,3,2],
+        [2,1,2,1,1,1,4,1,1,2],
+        [2,1,2,1,2,2,2,1,1,2],
+        [2,1,1,1,1,5,1,1,1,2],
+        [2,2,2,2,2,2,2,2,2,2]
+    ],
+    gravity: {x:0, y:0.3},
+    vel_limit: {x:2, y:16},
+    movement_speed: {jump:6, left:0.3, right:0.3},
+    player: {x:1, y:1, colour:'#33cc33'},
+    scripts: {
+        teleport: 'game.player.loc.x = 7; game.player.loc.y = 1;',
+        win: 'alert("You reached the goal!");',
+        death: 'alert("You died!");game.load_map(advancedMap);'
+    }
+};
+
 /* Clarity engine */
 
 var Clarity = function () {
@@ -591,6 +620,54 @@ Clarity.prototype.draw = function (context) {
     this.draw_player(context);
 };
 
+function render3DMap(mapData) {
+    if (typeof THREE === 'undefined') return;
+    var container = document.getElementById('scene3d');
+    if (!container) return;
+    var width = container.clientWidth;
+    var height = container.clientHeight;
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+    var renderer = new THREE.WebGLRenderer({antialias: true});
+    renderer.setSize(width, height);
+    renderer.setClearColor(0x222222);
+    container.appendChild(renderer.domElement);
+
+    var tileSize = mapData.tile_size;
+    var widthTiles = mapData.data[0].length;
+    var heightTiles = mapData.data.length;
+    for (var y = 0; y < heightTiles; y++) {
+        for (var x = 0; x < widthTiles; x++) {
+            var id = mapData.data[y][x];
+            var key = mapData.keys.find(function(k){ return k.id === id; }) || {colour: '#ccc'};
+            var geometry = new THREE.BoxGeometry(tileSize, tileSize / 2, tileSize);
+            var material = new THREE.MeshLambertMaterial({color: key.colour});
+            var cube = new THREE.Mesh(geometry, material);
+            cube.position.set(x * tileSize, -tileSize / 4, y * tileSize);
+            scene.add(cube);
+        }
+    }
+
+    // Basic lighting so colours are visible
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    var dir = new THREE.DirectionalLight(0xffffff, 0.6);
+    dir.position.set(1, 1, 0.5);
+    scene.add(dir);
+
+    var center = new THREE.Vector3(widthTiles * tileSize / 2, 0, heightTiles * tileSize / 2);
+    camera.position.set(center.x, heightTiles * tileSize, center.z + heightTiles * tileSize);
+    camera.lookAt(center);
+    if (THREE.OrbitControls) {
+        new THREE.OrbitControls(camera, renderer.domElement);
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+    }
+    animate();
+}
+
 /* Setup of the engine */
 
 window.requestAnimFrame =
@@ -611,7 +688,8 @@ canvas.height = 400;
 
 var game = new Clarity();
     game.set_viewport(canvas.width, canvas.height);
-    game.load_map(map);
+    game.load_map(advancedMap);
+    render3DMap(advancedMap);
 
     /* Limit the viewport to the confines of the map */
     game.limit_viewport = true;
